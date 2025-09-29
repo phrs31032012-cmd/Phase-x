@@ -52,6 +52,7 @@ canvas {
 </div>
 
 <script>
+// ====== Inicialização ======
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const startBtn=document.getElementById("startBtn");
@@ -75,62 +76,58 @@ let keys={}, mobileDir=0;
 let platforms=[], spikes=[], goal={x:0,y:0,w:40,h:40};
 let currentLevel=0, gameFinished=false;
 
-// ====== Geração de fases grandes com chão que se abre ======
+// ====== IA CRUEL ======
+let aiMessage="", aiTimer=0;
+function showAIMessage(msg){ aiMessage=msg; aiTimer=250; }
+
+// ====== Geração de fases grandes ======
 const levels=[];
 for(let lvl=0; lvl<40; lvl++){
   let pls=[], spks=[];
-  // Base da fase
   pls.push({x:0,y:canvas.height-20,w:canvas.width*2,h:20,fake:false,moving:false,dx:0,dy:0,breakable:false,disappear:false,visible:true});
-  
   let y=canvas.height-120, x=50;
   while(x<canvas.width*2-50){
-    let w = Math.random()*40+20;
-    let gap = Math.random()*60+30;
-    let fake = Math.random()<0.3;
-    let moving = Math.random()<0.25;
-    let breakable = Math.random()<0.25;
-    let disappear = Math.random()<0.2;
-    let dx = moving ? (Math.random()*6-3) : 0;
-    let dy = moving ? (Math.random()*2-1) : 0;
+    let w=Math.random()*40+20;
+    let gap=Math.random()*60+30;
+    let fake=Math.random()<0.3;
+    let moving=Math.random()<0.25;
+    let breakable=Math.random()<0.25;
+    let disappear=Math.random()<0.2;
+    let dx=moving?(Math.random()*6-3):0;
+    let dy=moving?(Math.random()*2-1):0;
     pls.push({x,y,w,h:20,fake,moving,dx,dy,breakable,disappear,visible:true});
-    
-    // Spikes aleatórios
-    if(Math.random()<0.15) spks.push({x:x+Math.random()*w-5, y:y+20, w:10, h:10});
-    
-    x += w+gap;
-    y -= Math.random()*80; if(y<50)y=50;
+    if(Math.random()<0.15) spks.push({x:x+Math.random()*w-5,y:y+20,w:10,h:10});
+    x+=w+gap;
+    y-=Math.random()*80; if(y<50)y=50;
   }
-  let goalX=canvas.width*2-60;
-  let goalY=pls[pls.length-1].y-40;
+  let goalX=canvas.width*2-60, goalY=pls[pls.length-1].y-40;
   levels.push({platforms:pls, spikes:spks, goal:{x:goalX,y:goalY,w:40,h:40}});
 }
 
 // ====== Carrega fase ======
 function loadLevel(n){
-  currentLevel = n;
-  let lvl = levels[n];
-  platforms = lvl.platforms.map(p=>({...p, visible:true}));
-  spikes = lvl.spikes.map(s=>({...s}));
-  goal = {...lvl.goal};
+  currentLevel=n;
+  let lvl=levels[n];
+  platforms=lvl.platforms.map(p=>({...p, visible:true}));
+  spikes=lvl.spikes.map(s=>({...s}));
+  goal={...lvl.goal};
   player.x=50; player.y=canvas.height-50; player.vx=0; player.vy=0; player.onGround=false;
   gameFinished=false;
 }
 
-// ====== Update ======
+// ====== Atualização ======
 function update(){
-  if(gameFinished) return;
-  
+  if(gameFinished)return;
   player.vx=0;
   if(keys["ArrowLeft"]||keys["a"]||mobileDir===-1) player.vx=-5;
   if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
-  
   player.vy+=gravity;
   player.x+=player.vx; player.y+=player.vy;
   player.onGround=false;
-  
+
   // Plataformas
   platforms.forEach(p=>{
-    if(!p.visible) return;
+    if(!p.visible)return;
     if(player.vy>=0 && player.x+player.w>p.x && player.x<p.x+p.w &&
        player.y+player.h>p.y && player.y+player.h<p.y+p.h){
       player.y=p.y-player.h; player.vy=0; player.onGround=true;
@@ -142,94 +139,71 @@ function update(){
       if(p.y<50||p.y>canvas.height-50)p.dy*=-1;
     }
   });
-  
-  // Spikes
-  spikes.forEach(s=>{
-    if(player.x<s.x+s.w && player.x+player.w>s.x && player.y<s.y+s.h && player.y+player.h>s.y){
-      loadLevel(currentLevel);
-    }
-  });
-  
-  // Caiu no void
-  if(player.y>canvas.height+200){
-    loadLevel(currentLevel);
-  }
-  
-  // Meta
-  if(player.x<goal.x+goal.w && player.x+player.w>goal.x &&
-     player.y<goal.y+goal.h && player.y+player.h>goal.y){
-    if(currentLevel===39){
-      gameFinished=true;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle="yellow";
-      ctx.font="80px Arial";
-      ctx.textAlign="center";
-      ctx.fillText("JESUS TE AMA ❤️",canvas.width/2,canvas.height/2);
-    } else loadLevel(currentLevel+1);
-  }
-  
+
   // Câmera
   camera.x=player.x-canvas.width/2+player.w/2;
   camera.y=player.y-canvas.height/2+player.h/2;
 }
 
-// ====== Draw ======
+// ====== Verificação de morte ======
+function checkDeath(){
+  let dead=false;
+  if(player.y>canvas.height+200) dead=true;
+  spikes.forEach(s=>{
+    if(player.x<s.x+s.w && player.x+player.w>s.x && player.y<s.y+s.h && player.y+player.h>s.y){
+      dead=true;
+    }
+  });
+  if(dead){
+    const cruelMessages=[
+      "HAHAHA! Sério que você caiu de novo?",
+      "Você é mesmo péssimo nisso!",
+      "Olha o seu corpo estúpido no chão…",
+      "Eu até começo a sentir pena… mas não!",
+      "Mais uma vez, recorde de fracassos!",
+      "Não se preocupe, o void te ama!",
+      "Tente de novo, você vai falhar de novo!",
+      "AHAHAHA, olha só esse desastre humano!",
+      "Patético… você não merece continuar!",
+      "Cada morte sua é uma piada nova pra mim 😈"
+    ];
+    const msg=cruelMessages[Math.floor(Math.random()*cruelMessages.length)];
+    showAIMessage(msg);
+    setTimeout(()=>{ loadLevel(currentLevel); },800);
+  }
+}
+
+// ====== Desenhar ======
 function draw(){
-  if(gameFinished) return;
+  if(gameFinished)return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();
   ctx.translate(-camera.x,-camera.y);
-  
-  // Plataformas
   platforms.forEach(p=>{
     if(p.visible && !p.fake){
       ctx.fillStyle=p.breakable?'orange':p.moving?'cyan':'white';
       ctx.fillRect(p.x,p.y,p.w,p.h);
     }
   });
-  
-  // Spikes
-  spikes.forEach(s=>{
-    ctx.fillStyle='red';
-    ctx.fillRect(s.x,s.y,s.w,s.h);
-  });
-  
-  // Meta
-  ctx.fillStyle='yellow';
-  ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
-  
-  // Player
-  ctx.fillStyle='red';
-  ctx.fillRect(player.x,player.y,player.w,player.h);
+  spikes.forEach(s=>{ctx.fillStyle='red';ctx.fillRect(s.x,s.y,s.w,s.h);});
+  ctx.fillStyle='yellow'; ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
+  ctx.fillStyle='red'; ctx.fillRect(player.x,player.y,player.w,player.h);
   ctx.restore();
 }
 
-// ====== Loop ======
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
-
-// ====== Controles ======
-document.addEventListener("keydown",e=>{
-  keys[e.key]=true;
-  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){
-    player.vy=jumpForce; player.onGround=false;
+// ====== Desenhar IA ======
+function drawAI(){
+  if(aiTimer>0){
+    ctx.save();
+    ctx.fillStyle=`rgba(255,0,0,${aiTimer/250})`;
+    ctx.font="28px Arial"; ctx.textAlign="center";
+    ctx.fillText(aiMessage,camera.x+canvas.width/2,camera.y+100);
+    ctx.restore(); aiTimer--;
   }
-});
-document.addEventListener("keyup",e=>{keys[e.key]=false;});
+}
 
-// Mobile
-const joystick=document.getElementById("joystick");
-const joystickInner=document.getElementById("joystickInner");
-const jumpBtn=document.getElementById("jumpBtn");
-let dragging=false;
-let joystickCenter={x:0,y:0};
+// ====== Loop principal ======
+function loop(){ update(); checkDeath(); draw(); drawAI(); requestAnimationFrame(loop); }
 
-joystick.addEventListener("touchstart", e=>{
-  dragging=true;
-  const rect=joystick.getBoundingClientRect();
-  joystickCenter={x:rect.left+rect.width/2, y:rect.top+rect.height/2};
-});
-joystick.addEventListener("touchmove", e=>{
-  if(!dragging) return;
-  const touch=e.touches[0];
-  const dx=touch.clientX-joystickCenter.x;
-  const dist=Math.min(Math.abs(dx
+// ====== Controles teclado ======
+document.addEventListener("keydown",e
