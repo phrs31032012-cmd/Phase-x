@@ -7,46 +7,57 @@
 <style>
 html, body {
   margin:0; padding:0; overflow:hidden;
-  background:#111; font-family:Arial, sans-serif; touch-action:none;
+  background:#111; font-family:Arial, sans-serif;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  height:100vh; touch-action:none;
 }
-h1 { text-align:center; margin-top:20px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000;}
+h1 {
+  font-size:60px; color:#ff4444;
+  text-shadow:0 0 15px #ff0000;
+  margin-bottom:20px; text-align:center;
+}
 button {
-  padding:16px 32px; font-size:20px; border:none; border-radius:10px; cursor:pointer; margin:10px;
+  padding:16px 32px; font-size:24px; border:none; border-radius:10px; cursor:pointer;
+  background:#e63946; color:white; font-weight:bold;
 }
-#startBtn { background:#e63946; color:white; font-weight:bold; }
-canvas { display:none; background:#111; border:3px solid #fff; }
-
+canvas {
+  display:none; background:#111; border:3px solid #fff;
+}
+/* ====== Controles Mobile ====== */
 #mobileControls { display:none; position:absolute; bottom:20px; width:100%; pointer-events:none; }
 #joystick, #jumpBtn { pointer-events:auto; }
 #joystick {
-  position:absolute; left:20px; bottom:20px; width:120px; height:120px; background:rgba(255,255,255,0.2); border-radius:50%;
+  position:absolute; left:20px; bottom:20px; width:120px; height:120px;
+  background:rgba(255,255,255,0.2); border-radius:50%;
   display:flex; justify-content:center; align-items:center;
 }
-#joystickInner { width:60px; height:60px; background:rgba(255,255,255,0.5); border-radius:50%; position:relative; left:0; }
+#joystickInner {
+  width:60px; height:60px; background:rgba(255,255,255,0.5);
+  border-radius:50%; position:relative; left:0;
+}
 #jumpBtn {
-  position:absolute; right:20px; bottom:40px; width:80px; height:80px; background:rgba(255,255,0,0.6);
-  border-radius:50%; font-size:40px; line-height:80px; color:#000;
+  position:absolute; right:20px; bottom:40px; width:80px; height:80px;
+  background:rgba(255,255,0,0.6); border-radius:50%;
+  font-size:40px; line-height:80px; color:#000; text-align:center;
 }
 </style>
 </head>
 <body>
 
 <h1>PHASE X</h1>
-<div id="menu">
-  <button id="startBtn">START</button>
-</div>
-
+<button id="startBtn">START</button>
 <canvas id="gameCanvas"></canvas>
+
 <div id="mobileControls">
   <div id="joystick"><div id="joystickInner"></div></div>
   <div id="jumpBtn">↑</div>
 </div>
 
 <script>
+// ====== Inicialização ======
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const startBtn=document.getElementById("startBtn");
-const menu=document.getElementById("menu");
 const mobileControls=document.getElementById("mobileControls");
 
 function resizeCanvas(){
@@ -56,77 +67,109 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-let player={x:50,y:0,w:30,h:30,vx:0,vy:0,onGround:false};
-let keys={};
-let gravity=0.6;
-let jumpForce=-12;
-let platforms=[];
-let goal={};
-let mobileDir=0;
-let currentLevel=0;
-let gameFinished=false;
+// ====== Player ======
+let player={
+  x:50, y:0, w:30, h:30,
+  vx:0, vy:0,
+  onGround:false
+};
+const gravity = 0.6;
+const jumpForce = -12;
 
-// Gerar 40 fases difíceis com pegadinhas
-const levels=[];
-for(let i=0;i<40;i++){
-  let pls=[{x:0,y:canvas.height-20,w:canvas.width,h:20}];
+// ====== Plataformas ======
+let platforms=[];
+let goal={x:0,y:0,w:40,h:40};
+let currentLevel = 0;
+let gameFinished = false;
+let keys={};
+let mobileDir=0;
+
+// ====== Câmera ======
+let camera = {x:0, y:0};
+
+// ====== Geração Procedural de 40 Fases ======
+const levels = [];
+for(let lvl=0; lvl<40; lvl++){
+  let pls=[];
+  // Plataforma base
+  pls.push({x:0,y:canvas.height-20,w:canvas.width,h:20,fake:false,moving:false,dx:0,dy:0,breakable:false,disappear:false,visible:true});
   let y=canvas.height-100;
   let x=50;
   while(x<canvas.width-100){
-    let w=Math.random()*80+50;
-    let gap=Math.random()*50+30;
-    let fake=false;
-    if(Math.random()<0.3){ w=0; fake=true;} // pegadinha: bloco falso
-    pls.push({x:x,y:y,w:w,h:20,fake:fake});
-    x+=w+gap;
-    y-=Math.random()*40; if(y<50) y=50;
+    let w = Math.random()*80+50;
+    let gap = Math.random()*30+30;
+    let fake = Math.random()<0.2;
+    let moving = Math.random()<0.2;
+    let breakable = Math.random()<0.2;
+    let disappear = Math.random()<0.2;
+    let dx = moving ? (Math.random()*4-2) : 0;
+    let dy = 0;
+    pls.push({x,y,w,h:20,fake,moving,dx,dy,breakable,disappear,visible:true});
+    x += w+gap;
+    y -= Math.random()*50;
+    if(y<50) y=50;
   }
   let goalX=canvas.width-60;
   let goalY=pls[pls.length-1].y-40;
   levels.push({platforms:pls, goal:{x:goalX,y:goalY,w:40,h:40}});
 }
 
+// ====== Carrega Fase ======
 function loadLevel(n){
-  currentLevel=n;
-  let lvl=levels[n];
-  platforms=lvl.platforms;
-  goal=lvl.goal;
-  player.x=50; player.y=canvas.height-50; player.vx=0; player.vy=0; player.onGround=false;
-  gameFinished=false;
+  currentLevel = n;
+  let lvl = levels[n];
+  platforms = lvl.platforms.map(p=>({...p, visible:true}));
+  goal = {...lvl.goal};
+  player.x = 50; player.y = canvas.height-50;
+  player.vx = 0; player.vy = 0; player.onGround = false;
+  gameFinished = false;
 }
 
+// ====== Update ======
 function update(){
   if(gameFinished) return;
+
+  // Movimento horizontal
+  player.vx = 0;
   if(keys["ArrowLeft"]||keys["a"]||mobileDir===-1) player.vx=-5;
-  else if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
-  else player.vx=0;
+  if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
 
-  player.vy+=gravity;
-  player.x+=player.vx;
-  player.y+=player.vy;
-
-  // Limitar player dentro da tela
-  if(player.x<0) player.x=0;
-  if(player.x+player.w>canvas.width) player.x=canvas.width-player.w;
+  // Gravidade
+  player.vy += gravity;
+  player.x += player.vx;
+  player.y += player.vy;
 
   player.onGround=false;
-  for(let p of platforms){
-    if(p.fake) continue;
-    if(player.x< p.x+p.w && player.x+player.w>p.x && player.y+player.h>p.y && player.y+player.h<p.y+20){
-      player.y=p.y-player.h;
-      player.vy=0;
-      player.onGround=true;
-    }
-  }
 
+  // Plataformas
+  platforms.forEach(p=>{
+    if(!p.visible) return;
+    if(!p.fake){
+      if(player.x < p.x+p.w && player.x+player.w > p.x && player.y+player.h > p.y && player.y+player.h < p.y+20){
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.onGround = true;
+        if(p.breakable) p.visible = false;
+        if(p.disappear) p.visible = false;
+      }
+    }
+
+    if(p.moving){
+      p.x += p.dx;
+      if(p.x<0 || p.x+p.w>canvas.width) p.dx*=-1;
+    }
+  });
+
+  // Limite chão
   if(player.y>canvas.height-20-player.h){
     player.y=canvas.height-20-player.h;
     player.vy=0;
     player.onGround=true;
   }
 
-  // Checa meta final
-  if(player.x<goal.x+goal.w && player.x+player.w>goal.x && player.y<goal.y+goal.h && player.y+player.h>goal.y){
+  // Meta
+  if(player.x < goal.x+goal.w && player.x+player.w > goal.x &&
+     player.y < goal.y+goal.h && player.y+player.h > goal.y){
     if(currentLevel===39){
       gameFinished=true;
       ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -138,50 +181,93 @@ function update(){
       loadLevel(currentLevel+1);
     }
   }
+
+  // Atualiza câmera
+  camera.x = player.x - canvas.width/2 + player.w/2;
+  camera.y = player.y - canvas.height/2 + player.h/2;
 }
 
+// ====== Draw ======
 function draw(){
   if(gameFinished) return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="white";
-  for(let p of platforms) if(!p.fake) ctx.fillRect(p.x,p.y,p.w,p.h);
-  ctx.fillStyle="yellow"; ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
-  ctx.fillStyle="red"; ctx.fillRect(player.x,player.y,player.w,player.h);
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  platforms.forEach(p=>{
+    if(p.visible && !p.fake){
+      ctx.fillStyle = p.breakable ? 'orange' : p.moving ? 'cyan' : 'white';
+      ctx.fillRect(p.x,p.y,p.w,p.h);
+    }
+  });
+
+  ctx.fillStyle = 'yellow';
+  ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
+
+  ctx.fillStyle='red';
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+
+  ctx.restore();
 }
 
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
+// ====== Loop ======
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
 
-// Teclado
+// ====== Controles Teclado ======
 document.addEventListener("keydown", e=>{
   keys[e.key]=true;
-  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){ player.vy=jumpForce; player.onGround=false;}
+  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){
+    player.vy = jumpForce; player.onGround=false;
+  }
 });
 document.addEventListener("keyup", e=>{ keys[e.key]=false; });
 
-// Touch Controls
+// ====== Controles Mobile ======
+const joystick = document.getElementById("joystick");
+const joystickInner = document.getElementById("joystickInner");
+const jumpBtn = document.getElementById("jumpBtn");
 let dragging=false;
-const joystick=document.getElementById("joystick");
-const joystickInner=document.getElementById("joystickInner");
-const jumpBtn=document.getElementById("jumpBtn");
-joystick.addEventListener("touchstart", e=>{ dragging=true; });
-joystick.addEventListener("touchend", e=>{ dragging=false; mobileDir=0; joystickInner.style.left="0px"; });
-joystick.addEventListener("touchmove", e=>{
+let joystickCenter = {x:0, y:0};
+
+joystick.addEventListener("touchstart", e => {
+  dragging = true;
+  const rect = joystick.getBoundingClientRect();
+  joystickCenter = {x: rect.left + rect.width/2, y: rect.top + rect.height/2};
+});
+joystick.addEventListener("touchmove", e => {
   if(!dragging) return;
-  let touch=e.touches[0];
-  let rect=joystick.getBoundingClientRect();
-  let x = touch.clientX - rect.left - rect.width/2;
-  if(x<-20){ mobileDir=-1; joystickInner.style.left="-20px"; }
-  else if(x>20){ mobileDir=1; joystickInner.style.left="20px"; }
-  else { mobileDir=0; joystickInner.style.left="0px"; }
+  const touch = e.touches[0];
+  const dx = touch.clientX - joystickCenter.x;
+  const angle = Math.atan2(0, dx);
+  const dist = Math.min(Math.abs(dx),50);
+  joystickInner.style.transform = `translate(${dx>0?dist:-dist}px,0px)`;
+  mobileDir = dx<-10?-1:dx>10?1:0;
 });
-jumpBtn.addEventListener("touchstart", e=>{ if(player.onGround){ player.vy=jumpForce; player.onGround=false;} });
+joystick.addEventListener("touchend", e => {
+  dragging = false;
+  joystickInner.style.transform = `translate(0px,0px)`;
+  mobileDir = 0;
+});
 
-// Start
+// Botão de pulo mobile
+jumpBtn.addEventListener("touchstart", e => {
+  if(player.onGround){ player.vy = jumpForce; player.onGround=false; }
+});
+
+// ====== Start ======
 startBtn.addEventListener("click", ()=>{
-  menu.style.display="none"; canvas.style.display="block"; mobileControls.style.display="block";
-  loadLevel(0); loop();
+  startBtn.style.display="none";
+  document.querySelector("h1").style.display="none";
+  canvas.style.display="block";
+  mobileControls.style.display="block";
+  loadLevel(0);
+  loop();
 });
-
 </script>
+
 </body>
 </html>
