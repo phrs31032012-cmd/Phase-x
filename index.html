@@ -5,40 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phase X</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    overflow: hidden; /* trava rolagem da página */
-    background: #000;
-    color: #fff;
-    font-family: Arial, sans-serif;
-    text-align: center;
-  }
-  h1 { margin-top: 40px; font-size: 50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
-  #menu { margin-top: 20px; }
-  button {
-    padding: 16px 32px;
-    font-size: 20px;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    margin: 10px;
-  }
-  #startBtn { background: #e63946; color: white; font-weight: bold; }
-  #restartBtn { background: #457b9d; color: white; }
-  #nextBtn { background: #2a9d8f; color: white; }
-  canvas { display: none; background: #111; margin-top:20px; border:3px solid #fff; }
+html, body {
+  margin:0; padding:0; overflow:hidden;
+  background:#000; color:#fff; font-family:Arial, sans-serif;
+  text-align:center;
+  touch-action:none; /* previne scroll no mobile */
+}
+h1 { margin-top:40px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
+#menu { margin-top:20px; }
+button {
+  padding:16px 32px; font-size:20px; border:none; border-radius:10px; cursor:pointer; margin:10px;
+}
+#startBtn { background:#e63946; color:white; font-weight:bold; }
+#restartBtn { background:#457b9d; color:white; }
+#nextBtn { background:#2a9d8f; color:white; }
+canvas { display:none; background:#111; margin-top:20px; border:3px solid #fff; }
+
+#mobileControls {
+  display:none; position:absolute; bottom:20px; width:100%; pointer-events:none;
+}
+#joystick, #jumpBtn {
+  pointer-events:auto; /* habilita toque */
+}
+#joystick {
+  position:absolute; left:20px; bottom:20px;
+  width:120px; height:120px; background:rgba(255,255,255,0.2); border-radius:50%;
+  display:flex; justify-content:center; align-items:center;
+}
+#joystickInner {
+  width:60px; height:60px; background:rgba(255,255,255,0.5); border-radius:50%;
+  position:relative; left:0;
+}
+#jumpBtn {
+  position:absolute; right:20px; bottom:40px;
+  width:80px; height:80px; background:rgba(255,255,0,0.6);
+  border-radius:50%; font-size:40px; line-height:80px; color:#000;
+}
 </style>
 </head>
 <body>
+
 <h1>PHASE X</h1>
 <div id="menu">
   <button id="startBtn">START</button>
 </div>
+
 <canvas id="gameCanvas" width="800" height="600"></canvas>
+
 <div id="controls" style="display:none;">
   <button id="restartBtn">Reiniciar Fase</button>
   <button id="nextBtn">Próxima Fase</button>
+</div>
+
+<div id="mobileControls">
+  <div id="joystick"><div id="joystickInner"></div></div>
+  <div id="jumpBtn">↑</div>
 </div>
 
 <script>
@@ -49,6 +70,10 @@ const restartBtn = document.getElementById("restartBtn");
 const nextBtn = document.getElementById("nextBtn");
 const controls = document.getElementById("controls");
 const menu = document.getElementById("menu");
+const mobileControls = document.getElementById("mobileControls");
+const joystick = document.getElementById("joystick");
+const joystickInner = document.getElementById("joystickInner");
+const jumpBtn = document.getElementById("jumpBtn");
 
 let currentLevel = 0;
 let player = {x:50,y:550,w:30,h:30,vx:0,vy:0,onGround:false};
@@ -57,6 +82,7 @@ let gravity = 0.6;
 let jumpForce = -12;
 let platforms = [];
 let goal = {};
+let mobileDir = 0; // -1 esquerda, 1 direita
 
 const levels = [
   {platforms:[{x:0,y:580,w:800,h:20},{x:200,y:500,w:100,h:20},{x:400,y:420,w:100,h:20},{x:600,y:340,w:100,h:20}], goal:{x:650,y:300,w:30,h:30}},
@@ -65,7 +91,7 @@ const levels = [
 ];
 
 function loadLevel(n){
-  currentLevel = n;
+  currentLevel=n;
   let lvl = levels[n];
   platforms = lvl.platforms;
   goal = lvl.goal;
@@ -74,24 +100,22 @@ function loadLevel(n){
 
 function update(){
   // Movimento horizontal
-  if(keys["ArrowLeft"] || keys["a"]) player.vx=-5;
-  else if(keys["ArrowRight"] || keys["d"]) player.vx=5;
+  if(keys["ArrowLeft"] || keys["a"] || mobileDir===-1) player.vx=-5;
+  else if(keys["ArrowRight"] || keys["d"] || mobileDir===1) player.vx=5;
   else player.vx=0;
 
-  player.vy += gravity;
-  player.x += player.vx;
-  player.y += player.vy;
+  player.vy+=gravity;
+  player.x+=player.vx;
+  player.y+=player.vy;
 
-  player.onGround = false;
+  player.onGround=false;
   for(let p of platforms){
-    if(player.x < p.x+p.w && player.x+player.w > p.x && player.y+player.h > p.y && player.y+player.h < p.y+20){
-      player.y = p.y - player.h;
-      player.vy = 0;
-      player.onGround = true;
+    if(player.x< p.x+p.w && player.x+player.w>p.x && player.y+player.h>p.y && player.y+player.h<p.y+20){
+      player.y=p.y-player.h; player.vy=0; player.onGround=true;
     }
   }
 
-  if(player.x < goal.x+goal.w && player.x+player.w > goal.x && player.y < goal.y+goal.h && player.y+player.h > goal.y){
+  if(player.x<goal.x+goal.w && player.x+player.w>goal.x && player.y<goal.y+goal.h && player.y+player.h>goal.y){
     alert("Fase concluída!");
     nextBtn.style.display="inline-block";
   }
@@ -105,30 +129,36 @@ function draw(){
   ctx.fillStyle="red"; ctx.fillRect(player.x,player.y,player.w,player.h);
 }
 
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
-document.addEventListener("keydown",e=>{
+document.addEventListener("keydown", e=>{
   keys[e.key]=true;
-  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){
-    player.vy=jumpForce; player.onGround=false;
-  }
+  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){ player.vy=jumpForce; player.onGround=false;}
 });
-document.addEventListener("keyup",e=>{
-  keys[e.key]=false;
+document.addEventListener("keyup", e=>{ keys[e.key]=false; });
+
+// Touch Controls
+let dragging=false;
+joystick.addEventListener("touchstart", e=>{ dragging=true; });
+joystick.addEventListener("touchend", e=>{ dragging=false; mobileDir=0; joystickInner.style.left="0px"; });
+joystick.addEventListener("touchmove", e=>{
+  if(!dragging) return;
+  let touch=e.touches[0];
+  let rect=joystick.getBoundingClientRect();
+  let x = touch.clientX - rect.left - rect.width/2;
+  if(x<-20){ mobileDir=-1; joystickInner.style.left="-20px"; }
+  else if(x>20){ mobileDir=1; joystickInner.style.left="20px"; }
+  else { mobileDir=0; joystickInner.style.left="0px"; }
 });
 
+jumpBtn.addEventListener("touchstart", e=>{ if(player.onGround){ player.vy=jumpForce; player.onGround=false;} });
+
+// Start & Game Controls
 startBtn.addEventListener("click", ()=>{
-  menu.style.display="none";
-  canvas.style.display="block";
-  controls.style.display="block";
-  loadLevel(0);
-  loop();
+  menu.style.display="none"; canvas.style.display="block"; controls.style.display="block"; mobileControls.style.display="block";
+  loadLevel(0); loop();
 });
-restartBtn.addEventListener("click", ()=>{loadLevel(currentLevel); nextBtn.style.display="none";});
+restartBtn.addEventListener("click", ()=>{ loadLevel(currentLevel); nextBtn.style.display="none"; });
 nextBtn.addEventListener("click", ()=>{
   if(currentLevel+1<levels.length){ loadLevel(currentLevel+1); nextBtn.style.display="none";}
   else alert("Você zerou todas as fases!");
