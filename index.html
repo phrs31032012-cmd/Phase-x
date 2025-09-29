@@ -52,7 +52,6 @@ canvas {
 </div>
 
 <script>
-// ====== Inicialização ======
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const startBtn=document.getElementById("startBtn");
@@ -65,27 +64,26 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// ====== Player ======
+// ===== Player =====
 let player={x:50, y:0, w:30, h:30, vx:0, vy:0, onGround:false};
-const gravity = 0.7;
-const jumpForce = -13;
-let camera={x:0, y:0};
+const gravity=0.7, jumpForce=-13;
+let camera={x:0,y:0};
 let keys={}, mobileDir=0;
 
-// ====== Plataformas e spikes ======
+// ===== Plataformas e spikes =====
 let platforms=[], spikes=[], goal={x:0,y:0,w:40,h:40};
 let currentLevel=0, gameFinished=false;
 
-// ====== IA CRUEL ======
+// ===== IA cruel =====
 let aiMessage="", aiTimer=0;
 function showAIMessage(msg){ aiMessage=msg; aiTimer=250; }
 
-// ====== Geração de fases grandes ======
+// ===== Fases =====
 const levels=[];
 for(let lvl=0; lvl<40; lvl++){
   let pls=[], spks=[];
   pls.push({x:0,y:canvas.height-20,w:canvas.width*2,h:20,fake:false,moving:false,dx:0,dy:0,breakable:false,disappear:false,visible:true});
-  let y=canvas.height-120, x=50;
+  let y=canvas.height-120,x=50;
   while(x<canvas.width*2-50){
     let w=Math.random()*40+20;
     let gap=Math.random()*60+30;
@@ -97,39 +95,35 @@ for(let lvl=0; lvl<40; lvl++){
     let dy=moving?(Math.random()*2-1):0;
     pls.push({x,y,w,h:20,fake,moving,dx,dy,breakable,disappear,visible:true});
     if(Math.random()<0.15) spks.push({x:x+Math.random()*w-5,y:y+20,w:10,h:10});
-    x+=w+gap;
-    y-=Math.random()*80; if(y<50)y=50;
+    x+=w+gap; y-=Math.random()*80;if(y<50)y=50;
   }
   let goalX=canvas.width*2-60, goalY=pls[pls.length-1].y-40;
-  levels.push({platforms:pls, spikes:spks, goal:{x:goalX,y:goalY,w:40,h:40}});
+  levels.push({platforms:pls,spikes:spks,goal:{x:goalX,y:goalY,w:40,h:40}});
 }
 
-// ====== Carrega fase ======
+// ===== Carrega fase =====
 function loadLevel(n){
   currentLevel=n;
   let lvl=levels[n];
-  platforms=lvl.platforms.map(p=>({...p, visible:true}));
+  platforms=lvl.platforms.map(p=>({...p,visible:true}));
   spikes=lvl.spikes.map(s=>({...s}));
   goal={...lvl.goal};
   player.x=50; player.y=canvas.height-50; player.vx=0; player.vy=0; player.onGround=false;
   gameFinished=false;
 }
 
-// ====== Atualização ======
+// ===== Update =====
 function update(){
   if(gameFinished)return;
   player.vx=0;
   if(keys["ArrowLeft"]||keys["a"]||mobileDir===-1) player.vx=-5;
   if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
-  player.vy+=gravity;
-  player.x+=player.vx; player.y+=player.vy;
+  player.vy+=gravity; player.x+=player.vx; player.y+=player.vy;
   player.onGround=false;
 
-  // Plataformas
   platforms.forEach(p=>{
     if(!p.visible)return;
-    if(player.vy>=0 && player.x+player.w>p.x && player.x<p.x+p.w &&
-       player.y+player.h>p.y && player.y+player.h<p.y+p.h){
+    if(player.vy>=0 && player.x+player.w>p.x && player.x<p.x+p.w && player.y+player.h>p.y && player.y+player.h<p.y+p.h){
       player.y=p.y-player.h; player.vy=0; player.onGround=true;
       if(p.breakable)p.visible=false;
       if(p.disappear)p.visible=false;
@@ -140,19 +134,16 @@ function update(){
     }
   });
 
-  // Câmera
   camera.x=player.x-canvas.width/2+player.w/2;
   camera.y=player.y-canvas.height/2+player.h/2;
 }
 
-// ====== Verificação de morte ======
+// ===== Checa morte =====
 function checkDeath(){
   let dead=false;
   if(player.y>canvas.height+200) dead=true;
   spikes.forEach(s=>{
-    if(player.x<s.x+s.w && player.x+player.w>s.x && player.y<s.y+s.h && player.y+player.h>s.y){
-      dead=true;
-    }
+    if(player.x<s.x+s.w && player.x+player.w>s.x && player.y<s.y+s.h && player.y+player.h>s.y) dead=true;
   });
   if(dead){
     const cruelMessages=[
@@ -169,21 +160,18 @@ function checkDeath(){
     ];
     const msg=cruelMessages[Math.floor(Math.random()*cruelMessages.length)];
     showAIMessage(msg);
-    setTimeout(()=>{ loadLevel(currentLevel); },800);
+    setTimeout(()=>{loadLevel(currentLevel);},800);
   }
 }
 
-// ====== Desenhar ======
+// ===== Desenha =====
 function draw(){
   if(gameFinished)return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();
   ctx.translate(-camera.x,-camera.y);
   platforms.forEach(p=>{
-    if(p.visible && !p.fake){
-      ctx.fillStyle=p.breakable?'orange':p.moving?'cyan':'white';
-      ctx.fillRect(p.x,p.y,p.w,p.h);
-    }
+    if(p.visible && !p.fake){ctx.fillStyle=p.breakable?'orange':p.moving?'cyan':'white';ctx.fillRect(p.x,p.y,p.w,p.h);}
   });
   spikes.forEach(s=>{ctx.fillStyle='red';ctx.fillRect(s.x,s.y,s.w,s.h);});
   ctx.fillStyle='yellow'; ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
@@ -191,7 +179,7 @@ function draw(){
   ctx.restore();
 }
 
-// ====== Desenhar IA ======
+// ===== Desenha IA =====
 function drawAI(){
   if(aiTimer>0){
     ctx.save();
@@ -202,8 +190,26 @@ function drawAI(){
   }
 }
 
-// ====== Loop principal ======
+// ===== Loop =====
 function loop(){ update(); checkDeath(); draw(); drawAI(); requestAnimationFrame(loop); }
 
-// ====== Controles teclado ======
-document.addEventListener("keydown",e
+// ===== Controles teclado =====
+document.addEventListener("keydown",e=>{
+  keys[e.key]=true;
+  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){player.vy=jumpForce; player.onGround=false;}
+});
+document.addEventListener("keyup",e=>{keys[e.key]=false;});
+
+// ===== Start =====
+startBtn.addEventListener("click",()=>{
+  startBtn.style.display="none";
+  document.querySelector("h1").style.display="none";
+  canvas.style.display="block";
+  mobileControls.style.display="block";
+  loadLevel(0);
+  loop();
+});
+</script>
+
+</body>
+</html>
