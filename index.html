@@ -3,19 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Phase X - Ultimate</title>
+<title>Phase X Ultimate</title>
 <style>
 html, body {
   margin:0; padding:0; overflow:hidden;
-  background:#000; color:#fff; font-family:Arial, sans-serif;
-  text-align:center; touch-action:none;
+  background:#111; font-family:Arial, sans-serif; touch-action:none;
 }
-h1 { margin-top:20px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
+h1 { text-align:center; margin-top:20px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000;}
 button {
   padding:16px 32px; font-size:20px; border:none; border-radius:10px; cursor:pointer; margin:10px;
 }
 #startBtn { background:#e63946; color:white; font-weight:bold; }
-#restartBtn { background:#457b9d; color:white; }
 canvas { display:none; background:#111; border:3px solid #fff; }
 
 #mobileControls { display:none; position:absolute; bottom:20px; width:100%; pointer-events:none; }
@@ -39,10 +37,6 @@ canvas { display:none; background:#111; border:3px solid #fff; }
 </div>
 
 <canvas id="gameCanvas"></canvas>
-<div id="controls" style="display:none;">
-  <button id="restartBtn">Reiniciar Fase</button>
-</div>
-
 <div id="mobileControls">
   <div id="joystick"><div id="joystickInner"></div></div>
   <div id="jumpBtn">↑</div>
@@ -52,15 +46,9 @@ canvas { display:none; background:#111; border:3px solid #fff; }
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const startBtn=document.getElementById("startBtn");
-const restartBtn=document.getElementById("restartBtn");
-const controls=document.getElementById("controls");
 const menu=document.getElementById("menu");
 const mobileControls=document.getElementById("mobileControls");
-const joystick=document.getElementById("joystick");
-const joystickInner=document.getElementById("joystickInner");
-const jumpBtn=document.getElementById("jumpBtn");
 
-// Ajuste landscape responsivo
 function resizeCanvas(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -68,7 +56,6 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-let currentLevel=0;
 let player={x:50,y:0,w:30,h:30,vx:0,vy:0,onGround:false};
 let keys={};
 let gravity=0.6;
@@ -76,22 +63,23 @@ let jumpForce=-12;
 let platforms=[];
 let goal={};
 let mobileDir=0;
+let currentLevel=0;
 let gameFinished=false;
 
-// ===== 40 Fases difíceis com pegadinhas =====
-const levels = [];
+// Gerar 40 fases difíceis com pegadinhas
+const levels=[];
 for(let i=0;i<40;i++){
   let pls=[{x:0,y:canvas.height-20,w:canvas.width,h:20}];
   let y=canvas.height-100;
   let x=50;
   while(x<canvas.width-100){
-    let w = Math.random()*80+50;
-    let gap=Math.random()*50+20;
+    let w=Math.random()*80+50;
+    let gap=Math.random()*50+30;
     let fake=false;
-    if(Math.random()<0.3){ w=0; fake=true; } // pegadinha
-    pls.push({x:x, y:y, w:w, h:20, fake:fake});
+    if(Math.random()<0.3){ w=0; fake=true;} // pegadinha: bloco falso
+    pls.push({x:x,y:y,w:w,h:20,fake:fake});
     x+=w+gap;
-    y-=Math.random()*50; if(y<50) y=50;
+    y-=Math.random()*40; if(y<50) y=50;
   }
   let goalX=canvas.width-60;
   let goalY=pls[pls.length-1].y-40;
@@ -109,7 +97,6 @@ function loadLevel(n){
 
 function update(){
   if(gameFinished) return;
-  // Movimento horizontal
   if(keys["ArrowLeft"]||keys["a"]||mobileDir===-1) player.vx=-5;
   else if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
   else player.vx=0;
@@ -124,7 +111,7 @@ function update(){
 
   player.onGround=false;
   for(let p of platforms){
-    if(p.fake) continue; // bloco falso
+    if(p.fake) continue;
     if(player.x< p.x+p.w && player.x+player.w>p.x && player.y+player.h>p.y && player.y+player.h<p.y+20){
       player.y=p.y-player.h;
       player.vy=0;
@@ -132,13 +119,13 @@ function update(){
     }
   }
 
-  if(player.y>canvas.height-20-player.h){ // chão
+  if(player.y>canvas.height-20-player.h){
     player.y=canvas.height-20-player.h;
     player.vy=0;
     player.onGround=true;
   }
 
-  // Verifica meta final
+  // Checa meta final
   if(player.x<goal.x+goal.w && player.x+player.w>goal.x && player.y<goal.y+goal.h && player.y+player.h>goal.y){
     if(currentLevel===39){
       gameFinished=true;
@@ -148,7 +135,7 @@ function update(){
       ctx.textAlign="center";
       ctx.fillText("JESUS TE AMA ❤️",canvas.width/2,canvas.height/2);
     } else {
-      alert("Fase concluída! Reinicie para jogar novamente.");
+      loadLevel(currentLevel+1);
     }
   }
 }
@@ -173,6 +160,9 @@ document.addEventListener("keyup", e=>{ keys[e.key]=false; });
 
 // Touch Controls
 let dragging=false;
+const joystick=document.getElementById("joystick");
+const joystickInner=document.getElementById("joystickInner");
+const jumpBtn=document.getElementById("jumpBtn");
 joystick.addEventListener("touchstart", e=>{ dragging=true; });
 joystick.addEventListener("touchend", e=>{ dragging=false; mobileDir=0; joystickInner.style.left="0px"; });
 joystick.addEventListener("touchmove", e=>{
@@ -184,15 +174,13 @@ joystick.addEventListener("touchmove", e=>{
   else if(x>20){ mobileDir=1; joystickInner.style.left="20px"; }
   else { mobileDir=0; joystickInner.style.left="0px"; }
 });
-
 jumpBtn.addEventListener("touchstart", e=>{ if(player.onGround){ player.vy=jumpForce; player.onGround=false;} });
 
-// Start & Restart
+// Start
 startBtn.addEventListener("click", ()=>{
-  menu.style.display="none"; canvas.style.display="block"; controls.style.display="block"; mobileControls.style.display="block";
+  menu.style.display="none"; canvas.style.display="block"; mobileControls.style.display="block";
   loadLevel(0); loop();
 });
-restartBtn.addEventListener("click", ()=>{ loadLevel(currentLevel); });
 
 </script>
 </body>
