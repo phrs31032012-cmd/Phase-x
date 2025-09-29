@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Phase X — Protótipo</title>
+  <style>
+    :root{
+      --bg:#0b0e12;
+      --card:#0f1720;
+      --accent:#d9534f;
+      --muted:#94a3b8;
+      --glass: rgba(255,255,255,0.04);
+      --big: 28px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{background:linear-gradient(180deg,#05060a 0%, #0b0e12 100%); color:#e6eef8; display:flex; align-items:center; justify-content:center; padding:20px;}
+    .container{width:100%;max-width:1100px;display:grid;grid-template-columns:420px 1fr;gap:20px;align-items:start;}
+    .panel{background:linear-gradient(180deg,var(--card), #0b1220); border-radius:14px; padding:20px; box-shadow: 0 8px 30px rgba(2,6,23,0.7); border:1px solid rgba(255,255,255,0.03);}
+    header h1{font-size:28px;margin:0 0 8px}
+    header p{margin:0;color:var(--muted)}
+    .controls{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+    label{font-size:14px;color:var(--muted)}
+    input[type="text"]{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass); color:inherit}
+    .btn{display:inline-block;padding:10px 14px;border-radius:10px;border:none;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
+    .small{font-size:13px;color:var(--muted)}
+    .meta{margin-top:12px;font-size:13px;color:var(--muted)}
+    /* canvas area */
+    .game-wrap{position:relative;height:640px;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#071126,#000);}
+    canvas{display:block;width:100%;height:100%;background:transparent}
+    .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:8px;font-weight:600}
+    .hud .label{font-size:13px;color:var(--muted);font-weight:500}
+    .footer-note{margin-top:12px;color:var(--muted);font-size:13px}
+    @media(max-width:900px){.container{grid-template-columns:1fr;}}
+    /* Large accessible text option */
+    .large-text *{font-size:calc(1rem + 6px) !important}
+    .legend{margin-top:10px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <div class="panel" id="leftPanel">
+      <header>
+        <h1>Phase X</h1>
+        <p>Protótipo: desafio imprevisível de plataforma — cada morte embaralha o nível.</p>
+      </header>
+
+      <div class="controls" aria-label="Controles do jogo">
+        <label for="playerName">Seu nome (opcional)</label>
+        <input id="playerName" type="text" placeholder="Pedro" />
+
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button id="startBtn" class="btn">Iniciar Jogo</button>
+          <button id="toggleText" class="btn" style="background:#2563eb">Texto grande</button>
+        </div>
+
+        <div class="meta">
+          <div><strong>Controles:</strong></div>
+          <div class="legend">Setas / WASD — mover / pular. R — reiniciar. Espaço = pulo também.</div>
+        </div>
+
+        <div class="footer-note">
+          <div style="margin-top:10px"><strong>Objetivo:</strong> alcance a bandeira sem morrer. A cada morte o nível muda.</div>
+          <div style="margin-top:8px;color:var(--muted)">Highscore (tempo mais longo sobrevivendo) salvo automaticamente.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" aria-live="polite">
+      <div class="game-wrap" role="application" aria-label="Área do jogo">
+        <canvas id="gameCanvas" width="800" height="640"></canvas>
+        <div class="hud" id="hud" aria-hidden="false">
+          <div id="hudScore">Morte: 0</div>
+          <div id="hudTime" style="font-size:12px;color:var(--muted)">Tempo: 0s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* Phase X — Protótipo em Canvas (Single-file)
+   - Plataformas móveis/desaparecem
+   - Armadilhas invisíveis que ativam por tempo
+   - Inimigo adaptativo que acelera a cada morte
+   - Níveis randomizados a cada morte
+   - Salva highscore no localStorage
+*/
+
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  const W = canvas.width, H = canvas.height;
+
+  // State
+  let playerName = '';
+  let deathCount = 0;
+  let startTime = Date.now();
+  let running = false;
+  let lastFrame = 0;
+  let level = null;
+  let keys = {};
+  let highscoreKey = 'phasex_highscore_v1';
+  let high = localStorage.getItem(highscoreKey) || 0;
+
+  // HUD
+  const hudScore = document.getElementById('hudScore');
+  const hudTime = document.getElementById('hudTime');
+
+  // Utils
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+  function rndInt(a,b){ return Math.floor(rand(a,b+1)); }
+
+  // Entities
+  class Player {
+    constructor(x,y){
+      this.x=x;this.y=y;this.w=28;this.h=40;
+      this.vx=0;this.vy=0;this.onGround=false;
+      this.color='#bfe3ff';
+    }
+    update(dt, level){
+      const accel = 0.0025;
+      const maxVx = 240;
+      // Input
+      if(keys.left) this.vx -= accel*dt;
+      if(keys.right) this.vx += accel*dt;
+      // friction
+      this.vx *= 0.995;
+      if(this.vx > maxVx) this.vx = maxVx;
+      if(this.vx < -maxVx) this.vx = -maxVx;
+      // gravity
+      this.vy += 0.0018 * dt;
+      // jump
+      if((keys.up || keys.space) && this.onGround){
+        this.vy = -0.56 - Math.min(0.12, deathCount*0.01);
+        this.onGround = false;
+      }
+
+      // movement
+      this.x += this.vx * dt/16;
+      this.y += this.vy * dt/16;
+
+      // world bounds
+      if(this.x < 0) this.x = 0;
+      if(this.x + this.w > W) this.x = W - this.w;
+
+      // Collisions with platforms
+      this.onGround = false;
+      for(let p of level.platforms){
+        // platform bounds
+        let px = p.x, py = p.y, pw = p.w, ph = p.h;
+        if (this.x + this.w > px && this.x < px + pw){
+          // coming down
+          if (this.vy >= 0 && this.y + this.h <= py + 6 && this.y + this.h + this.vy*dt/16 >= py){
+            // platform active?
+            if(p.active){
+              this.y = py - this.h;
+              this.vy = 0;
+              this.onGround = true;
+              if(p.type === 'disappear' && !p.triggered){
+                // schedule removal after tiny delay
+                p.triggered = true;
+                setTimeout(()=>{ p.active=false; }, rndInt(400,1200));
+              }
+            }
+          }
+        }
+      }
+
+      // fall off bottom -> death
+      if(this.y > H + 50) level.onPlayerDeath();
+    }
+    draw(ctx){
+      ctx.fillStyle=this.color;
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
+    }
+  }
+
+  class Platform {
+    constructor(x,y,w,type='normal'){
+      this.x=x;this.y=y;this.w=w;this.h=12;
+      this.type=type; // normal, moving, disappear, trap
+      this.active=true; this
