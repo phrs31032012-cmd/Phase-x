@@ -2,43 +2,31 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Phase X</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Phase X - Ultimate</title>
 <style>
 html, body {
   margin:0; padding:0; overflow:hidden;
   background:#000; color:#fff; font-family:Arial, sans-serif;
-  text-align:center;
-  touch-action:none; /* previne scroll no mobile */
+  text-align:center; touch-action:none;
 }
-h1 { margin-top:40px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
-#menu { margin-top:20px; }
+h1 { margin-top:20px; font-size:50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
 button {
   padding:16px 32px; font-size:20px; border:none; border-radius:10px; cursor:pointer; margin:10px;
 }
 #startBtn { background:#e63946; color:white; font-weight:bold; }
 #restartBtn { background:#457b9d; color:white; }
-#nextBtn { background:#2a9d8f; color:white; }
-canvas { display:none; background:#111; margin-top:20px; border:3px solid #fff; }
+canvas { display:none; background:#111; border:3px solid #fff; }
 
-#mobileControls {
-  display:none; position:absolute; bottom:20px; width:100%; pointer-events:none;
-}
-#joystick, #jumpBtn {
-  pointer-events:auto; /* habilita toque */
-}
+#mobileControls { display:none; position:absolute; bottom:20px; width:100%; pointer-events:none; }
+#joystick, #jumpBtn { pointer-events:auto; }
 #joystick {
-  position:absolute; left:20px; bottom:20px;
-  width:120px; height:120px; background:rgba(255,255,255,0.2); border-radius:50%;
+  position:absolute; left:20px; bottom:20px; width:120px; height:120px; background:rgba(255,255,255,0.2); border-radius:50%;
   display:flex; justify-content:center; align-items:center;
 }
-#joystickInner {
-  width:60px; height:60px; background:rgba(255,255,255,0.5); border-radius:50%;
-  position:relative; left:0;
-}
+#joystickInner { width:60px; height:60px; background:rgba(255,255,255,0.5); border-radius:50%; position:relative; left:0; }
 #jumpBtn {
-  position:absolute; right:20px; bottom:40px;
-  width:80px; height:80px; background:rgba(255,255,0,0.6);
+  position:absolute; right:20px; bottom:40px; width:80px; height:80px; background:rgba(255,255,0,0.6);
   border-radius:50%; font-size:40px; line-height:80px; color:#000;
 }
 </style>
@@ -50,11 +38,9 @@ canvas { display:none; background:#111; margin-top:20px; border:3px solid #fff; 
   <button id="startBtn">START</button>
 </div>
 
-<canvas id="gameCanvas" width="800" height="600"></canvas>
-
+<canvas id="gameCanvas"></canvas>
 <div id="controls" style="display:none;">
   <button id="restartBtn">Reiniciar Fase</button>
-  <button id="nextBtn">Próxima Fase</button>
 </div>
 
 <div id="mobileControls">
@@ -63,74 +49,122 @@ canvas { display:none; background:#111; margin-top:20px; border:3px solid #fff; 
 </div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const startBtn = document.getElementById("startBtn");
-const restartBtn = document.getElementById("restartBtn");
-const nextBtn = document.getElementById("nextBtn");
-const controls = document.getElementById("controls");
-const menu = document.getElementById("menu");
-const mobileControls = document.getElementById("mobileControls");
-const joystick = document.getElementById("joystick");
-const joystickInner = document.getElementById("joystickInner");
-const jumpBtn = document.getElementById("jumpBtn");
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+const startBtn=document.getElementById("startBtn");
+const restartBtn=document.getElementById("restartBtn");
+const controls=document.getElementById("controls");
+const menu=document.getElementById("menu");
+const mobileControls=document.getElementById("mobileControls");
+const joystick=document.getElementById("joystick");
+const joystickInner=document.getElementById("joystickInner");
+const jumpBtn=document.getElementById("jumpBtn");
 
-let currentLevel = 0;
-let player = {x:50,y:550,w:30,h:30,vx:0,vy:0,onGround:false};
-let keys = {};
-let gravity = 0.6;
-let jumpForce = -12;
-let platforms = [];
-let goal = {};
-let mobileDir = 0; // -1 esquerda, 1 direita
+// Ajuste landscape responsivo
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-const levels = [
-  {platforms:[{x:0,y:580,w:800,h:20},{x:200,y:500,w:100,h:20},{x:400,y:420,w:100,h:20},{x:600,y:340,w:100,h:20}], goal:{x:650,y:300,w:30,h:30}},
-  {platforms:[{x:0,y:580,w:800,h:20},{x:150,y:500,w:80,h:20},{x:300,y:430,w:80,h:20},{x:450,y:360,w:80,h:20},{x:600,y:290,w:80,h:20}], goal:{x:620,y:250,w:30,h:30}},
-  {platforms:[{x:0,y:580,w:800,h:20},{x:100,y:520,w:80,h:20},{x:250,y:460,w:80,h:20},{x:400,y:400,w:80,h:20},{x:550,y:340,w:80,h:20},{x:700,y:280,w:80,h:20}], goal:{x:720,y:240,w:30,h:30}}
-];
+let currentLevel=0;
+let player={x:50,y:0,w:30,h:30,vx:0,vy:0,onGround:false};
+let keys={};
+let gravity=0.6;
+let jumpForce=-12;
+let platforms=[];
+let goal={};
+let mobileDir=0;
+let gameFinished=false;
+
+// ===== 40 Fases difíceis com pegadinhas =====
+const levels = [];
+for(let i=0;i<40;i++){
+  let pls=[{x:0,y:canvas.height-20,w:canvas.width,h:20}];
+  let y=canvas.height-100;
+  let x=50;
+  while(x<canvas.width-100){
+    let w = Math.random()*80+50;
+    let gap=Math.random()*50+20;
+    let fake=false;
+    if(Math.random()<0.3){ w=0; fake=true; } // pegadinha
+    pls.push({x:x, y:y, w:w, h:20, fake:fake});
+    x+=w+gap;
+    y-=Math.random()*50; if(y<50) y=50;
+  }
+  let goalX=canvas.width-60;
+  let goalY=pls[pls.length-1].y-40;
+  levels.push({platforms:pls, goal:{x:goalX,y:goalY,w:40,h:40}});
+}
 
 function loadLevel(n){
   currentLevel=n;
-  let lvl = levels[n];
-  platforms = lvl.platforms;
-  goal = lvl.goal;
-  player.x=50; player.y=550; player.vx=0; player.vy=0; player.onGround=false;
+  let lvl=levels[n];
+  platforms=lvl.platforms;
+  goal=lvl.goal;
+  player.x=50; player.y=canvas.height-50; player.vx=0; player.vy=0; player.onGround=false;
+  gameFinished=false;
 }
 
 function update(){
+  if(gameFinished) return;
   // Movimento horizontal
-  if(keys["ArrowLeft"] || keys["a"] || mobileDir===-1) player.vx=-5;
-  else if(keys["ArrowRight"] || keys["d"] || mobileDir===1) player.vx=5;
+  if(keys["ArrowLeft"]||keys["a"]||mobileDir===-1) player.vx=-5;
+  else if(keys["ArrowRight"]||keys["d"]||mobileDir===1) player.vx=5;
   else player.vx=0;
 
   player.vy+=gravity;
   player.x+=player.vx;
   player.y+=player.vy;
 
+  // Limitar player dentro da tela
+  if(player.x<0) player.x=0;
+  if(player.x+player.w>canvas.width) player.x=canvas.width-player.w;
+
   player.onGround=false;
   for(let p of platforms){
+    if(p.fake) continue; // bloco falso
     if(player.x< p.x+p.w && player.x+player.w>p.x && player.y+player.h>p.y && player.y+player.h<p.y+20){
-      player.y=p.y-player.h; player.vy=0; player.onGround=true;
+      player.y=p.y-player.h;
+      player.vy=0;
+      player.onGround=true;
     }
   }
 
+  if(player.y>canvas.height-20-player.h){ // chão
+    player.y=canvas.height-20-player.h;
+    player.vy=0;
+    player.onGround=true;
+  }
+
+  // Verifica meta final
   if(player.x<goal.x+goal.w && player.x+player.w>goal.x && player.y<goal.y+goal.h && player.y+player.h>goal.y){
-    alert("Fase concluída!");
-    nextBtn.style.display="inline-block";
+    if(currentLevel===39){
+      gameFinished=true;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle="yellow";
+      ctx.font="80px Arial";
+      ctx.textAlign="center";
+      ctx.fillText("JESUS TE AMA ❤️",canvas.width/2,canvas.height/2);
+    } else {
+      alert("Fase concluída! Reinicie para jogar novamente.");
+    }
   }
 }
 
 function draw(){
+  if(gameFinished) return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle="white";
-  for(let p of platforms) ctx.fillRect(p.x,p.y,p.w,p.h);
+  for(let p of platforms) if(!p.fake) ctx.fillRect(p.x,p.y,p.w,p.h);
   ctx.fillStyle="yellow"; ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
   ctx.fillStyle="red"; ctx.fillRect(player.x,player.y,player.w,player.h);
 }
 
 function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
+// Teclado
 document.addEventListener("keydown", e=>{
   keys[e.key]=true;
   if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){ player.vy=jumpForce; player.onGround=false;}
@@ -153,16 +187,13 @@ joystick.addEventListener("touchmove", e=>{
 
 jumpBtn.addEventListener("touchstart", e=>{ if(player.onGround){ player.vy=jumpForce; player.onGround=false;} });
 
-// Start & Game Controls
+// Start & Restart
 startBtn.addEventListener("click", ()=>{
   menu.style.display="none"; canvas.style.display="block"; controls.style.display="block"; mobileControls.style.display="block";
   loadLevel(0); loop();
 });
-restartBtn.addEventListener("click", ()=>{ loadLevel(currentLevel); nextBtn.style.display="none"; });
-nextBtn.addEventListener("click", ()=>{
-  if(currentLevel+1<levels.length){ loadLevel(currentLevel+1); nextBtn.style.display="none";}
-  else alert("Você zerou todas as fases!");
-});
+restartBtn.addEventListener("click", ()=>{ loadLevel(currentLevel); });
+
 </script>
 </body>
 </html>
