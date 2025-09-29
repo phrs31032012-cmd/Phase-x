@@ -1,204 +1,138 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Phase X</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(180deg,#05060a,#0b0e12);
-      color: white;
-      text-align: center;
-    }
-    h1 {
-      margin-top: 40px;
-      font-size: 40px;
-    }
-    #menu {
-      margin-top: 20px;
-    }
-    button {
-      padding: 16px 32px;
-      font-size: 20px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      margin: 10px;
-    }
-    #startBtn {
-      background: #e63946;
-      color: white;
-      font-weight: bold;
-    }
-    #restartBtn {
-      background: #457b9d;
-      color: white;
-    }
-    #nextBtn {
-      background: #2a9d8f;
-      color: white;
-    }
-    canvas {
-      display: none;
-      background: #000;
-      margin-top: 20px;
-      border: 3px solid #fff;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase X</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* trava rolagem da página */
+    background: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+  h1 { margin-top: 40px; font-size: 50px; color:#ff4444; text-shadow:0 0 10px #ff0000; }
+  #menu { margin-top: 20px; }
+  button {
+    padding: 16px 32px;
+    font-size: 20px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin: 10px;
+  }
+  #startBtn { background: #e63946; color: white; font-weight: bold; }
+  #restartBtn { background: #457b9d; color: white; }
+  #nextBtn { background: #2a9d8f; color: white; }
+  canvas { display: none; background: #111; margin-top:20px; border:3px solid #fff; }
+</style>
 </head>
 <body>
-  <h1>PHASE X</h1>
-  
-  <div id="menu">
-    <button id="startBtn">START</button>
-  </div>
+<h1>PHASE X</h1>
+<div id="menu">
+  <button id="startBtn">START</button>
+</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="controls" style="display:none;">
+  <button id="restartBtn">Reiniciar Fase</button>
+  <button id="nextBtn">Próxima Fase</button>
+</div>
 
-  <canvas id="gameCanvas" width="800" height="600"></canvas>
-  <div id="controls" style="display:none;">
-    <button id="restartBtn">Reiniciar Fase</button>
-    <button id="nextBtn">Próxima Fase</button>
-  </div>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const startBtn = document.getElementById("startBtn");
+const restartBtn = document.getElementById("restartBtn");
+const nextBtn = document.getElementById("nextBtn");
+const controls = document.getElementById("controls");
+const menu = document.getElementById("menu");
 
-  <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const startBtn = document.getElementById("startBtn");
-    const restartBtn = document.getElementById("restartBtn");
-    const nextBtn = document.getElementById("nextBtn");
-    const controls = document.getElementById("controls");
-    const menu = document.getElementById("menu");
+let currentLevel = 0;
+let player = {x:50,y:550,w:30,h:30,vx:0,vy:0,onGround:false};
+let keys = {};
+let gravity = 0.6;
+let jumpForce = -12;
+let platforms = [];
+let goal = {};
 
-    let currentLevel = 0;
-    let player = {x:50, y:550, w:30, h:30, vx:0, vy:0, onGround:false};
-    let keys = {};
-    let gravity = 0.6;
-    let jumpForce = -12;
-    let platforms = [];
-    let goal = {};
+const levels = [
+  {platforms:[{x:0,y:580,w:800,h:20},{x:200,y:500,w:100,h:20},{x:400,y:420,w:100,h:20},{x:600,y:340,w:100,h:20}], goal:{x:650,y:300,w:30,h:30}},
+  {platforms:[{x:0,y:580,w:800,h:20},{x:150,y:500,w:80,h:20},{x:300,y:430,w:80,h:20},{x:450,y:360,w:80,h:20},{x:600,y:290,w:80,h:20}], goal:{x:620,y:250,w:30,h:30}},
+  {platforms:[{x:0,y:580,w:800,h:20},{x:100,y:520,w:80,h:20},{x:250,y:460,w:80,h:20},{x:400,y:400,w:80,h:20},{x:550,y:340,w:80,h:20},{x:700,y:280,w:80,h:20}], goal:{x:720,y:240,w:30,h:30}}
+];
 
-    // === 40 fases declaradas ===
-    const levels = [
-      { // Fase 1
-        platforms: [
-          {x:0,y:580,w:800,h:20},
-          {x:200,y:500,w:100,h:20},
-          {x:400,y:420,w:100,h:20},
-          {x:600,y:340,w:100,h:20}
-        ],
-        goal: {x:650,y:300,w:30,h:30}
-      },
-      { // Fase 2
-        platforms: [
-          {x:0,y:580,w:800,h:20},
-          {x:150,y:500,w:80,h:20},
-          {x:300,y:430,w:80,h:20},
-          {x:450,y:360,w:80,h:20},
-          {x:600,y:290,w:80,h:20}
-        ],
-        goal: {x:620,y:250,w:30,h:30}
-      },
-      { // Fase 3
-        platforms: [
-          {x:0,y:580,w:800,h:20},
-          {x:100,y:520,w:80,h:20},
-          {x:250,y:460,w:80,h:20},
-          {x:400,y:400,w:80,h:20},
-          {x:550,y:340,w:80,h:20},
-          {x:700,y:280,w:80,h:20}
-        ],
-        goal: {x:720,y:240,w:30,h:30}
-      }
-      // 👉 daqui em diante você pode declarar até a fase 40
-    ];
+function loadLevel(n){
+  currentLevel = n;
+  let lvl = levels[n];
+  platforms = lvl.platforms;
+  goal = lvl.goal;
+  player.x=50; player.y=550; player.vx=0; player.vy=0; player.onGround=false;
+}
 
-    function loadLevel(n){
-      currentLevel = n;
-      let lvl = levels[n];
-      platforms = lvl.platforms;
-      goal = lvl.goal;
-      player.x = 50;
-      player.y = 550;
-      player.vx = 0;
+function update(){
+  // Movimento horizontal
+  if(keys["ArrowLeft"] || keys["a"]) player.vx=-5;
+  else if(keys["ArrowRight"] || keys["d"]) player.vx=5;
+  else player.vx=0;
+
+  player.vy += gravity;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  player.onGround = false;
+  for(let p of platforms){
+    if(player.x < p.x+p.w && player.x+player.w > p.x && player.y+player.h > p.y && player.y+player.h < p.y+20){
+      player.y = p.y - player.h;
       player.vy = 0;
+      player.onGround = true;
     }
+  }
 
-    function update(){
-      player.vy += gravity;
-      player.x += player.vx;
-      player.y += player.vy;
+  if(player.x < goal.x+goal.w && player.x+player.w > goal.x && player.y < goal.y+goal.h && player.y+player.h > goal.y){
+    alert("Fase concluída!");
+    nextBtn.style.display="inline-block";
+  }
+}
 
-      player.onGround = false;
-      for(let p of platforms){
-        if(player.x < p.x+p.w && player.x+player.w > p.x &&
-           player.y+player.h > p.y && player.y+player.h < p.y+20){
-          player.y = p.y-player.h;
-          player.vy = 0;
-          player.onGround = true;
-        }
-      }
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="white";
+  for(let p of platforms) ctx.fillRect(p.x,p.y,p.w,p.h);
+  ctx.fillStyle="yellow"; ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
+  ctx.fillStyle="red"; ctx.fillRect(player.x,player.y,player.w,player.h);
+}
 
-      if(player.x < goal.x+goal.w && player.x+player.w > goal.x &&
-         player.y < goal.y+goal.h && player.y+player.h > goal.y){
-        alert("Fase concluída!");
-        nextBtn.style.display="inline-block";
-      }
-    }
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
 
-    function draw(){
-      ctx.clearRect(0,0,800,600);
-      ctx.fillStyle="white";
-      for(let p of platforms){
-        ctx.fillRect(p.x,p.y,p.w,p.h);
-      }
-      ctx.fillStyle="yellow";
-      ctx.fillRect(goal.x,goal.y,goal.w,goal.h);
-      ctx.fillStyle="red";
-      ctx.fillRect(player.x,player.y,player.w,player.h);
-    }
+document.addEventListener("keydown",e=>{
+  keys[e.key]=true;
+  if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){
+    player.vy=jumpForce; player.onGround=false;
+  }
+});
+document.addEventListener("keyup",e=>{
+  keys[e.key]=false;
+});
 
-    function loop(){
-      update();
-      draw();
-      requestAnimationFrame(loop);
-    }
-
-    document.addEventListener("keydown", e=>{
-      keys[e.key] = true;
-      if((e.key==="ArrowUp"||e.key==="w"||e.key===" ") && player.onGround){
-        player.vy = jumpForce;
-        player.onGround=false;
-      }
-      if(e.key==="ArrowLeft"||e.key==="a") player.vx=-5;
-      if(e.key==="ArrowRight"||e.key==="d") player.vx=5;
-    });
-
-    document.addEventListener("keyup", e=>{
-      keys[e.key] = false;
-      if(e.key==="ArrowLeft"||e.key==="a"||e.key==="ArrowRight"||e.key==="d") player.vx=0;
-    });
-
-    startBtn.addEventListener("click", ()=>{
-      menu.style.display="none";
-      canvas.style.display="block";
-      controls.style.display="block";
-      loadLevel(0);
-      loop();
-    });
-
-    restartBtn.addEventListener("click", ()=>{
-      loadLevel(currentLevel);
-    });
-
-    nextBtn.addEventListener("click", ()=>{
-      if(currentLevel+1 < levels.length){
-        loadLevel(currentLevel+1);
-        nextBtn.style.display="none";
-      } else {
-        alert("Você zerou todas as fases!");
-      }
-    });
-  </script>
+startBtn.addEventListener("click", ()=>{
+  menu.style.display="none";
+  canvas.style.display="block";
+  controls.style.display="block";
+  loadLevel(0);
+  loop();
+});
+restartBtn.addEventListener("click", ()=>{loadLevel(currentLevel); nextBtn.style.display="none";});
+nextBtn.addEventListener("click", ()=>{
+  if(currentLevel+1<levels.length){ loadLevel(currentLevel+1); nextBtn.style.display="none";}
+  else alert("Você zerou todas as fases!");
+});
+</script>
 </body>
 </html>
